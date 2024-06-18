@@ -9,7 +9,7 @@
 # to easily build a customized fresh image for the new release.
 #
 # This script provides the infrastructure for your customization scripts to work
-# in a repeatable manner against an official RasPiOS IMG file. 
+# in a repeatable manner against an official RasPiOS IMG file.
 #
 # sdm [switches] image-name
 # sdm --help will provide help on all available switches
@@ -68,7 +68,7 @@ function extendandresize() {
     echo "% (Ignore 'on-line resizing required' message)"
     loopdev=$(getloopdev $SDMPT)
     resize2fs ${loopdev}
-}    
+}
 
 function poptcheck() {
     #
@@ -134,10 +134,10 @@ Commands
  --info what         Display list of Locales, Keymaps, WiFi Countries, or Timezones
  --mount             Mount IMG file partitions and drop into interactive bash shell
  --ppart             Print partition tables in an IMG
- --shrink            Shrink an IMG file 
+ --shrink            Shrink an IMG file
 Command Switches for --customize and --burn or as noted
  --1piboot conf-file Use alternate 1piboot.conf
- --apt-dist-upgrade  Use apt-get dist-upgrade instead of upgrade 
+ --apt-dist-upgrade  Use apt-get dist-upgrade instead of upgrade
  --aptcache IPADDR   Use apt-cacher-ng with server 'IPADDR'
  --aptmaint options  Do apt commands batch-mode in the image (update, upgrade, autoremove)
  --apt-options str   Control which apt functions are done (D: all) Values: noupdate,noupgrade,noautoremove,none
@@ -185,6 +185,7 @@ Command Switches for --customize and --burn or as noted
  --runonly plugins   Do no customization, ony run requested plugins
  --sdmdir /path/to/sdm Put sdm here instead of /usr/local/sdm when customizing an IMG
  --showapt           Display apt output as well as logging it
+ --single            IMG has a single partition, i.e., U-Boot or similar
  --xmb n             Set the --extend size in MB [2048]
  --version           Print sdm version number"
 }
@@ -237,6 +238,7 @@ fextendonly=0               #1=Just extend and exit (this if no other command sp
 fgpt=0                      #1=Convert burned device to gpt format
 fnoexpandroot=0             #1=Don't expand root partition and don't let RasPiOS do it either
 fppart=0                    #1=Print partition tables in an IMG
+froot=2	                    #Partition number of root partition (2=normal, 1=U-Boot)
 frunonly=0                  #1=--runonly
 fshrink=0                   #1=Shrink the IMG
 hname=""                    #Host name when using --burn
@@ -245,7 +247,7 @@ hotspot=""                  #WiFi config file
 imgext=0                    #Number of MB to extend IMG
 infocmd=0                   #1=--info command
 keyfile=""                  #--key-file
-loadl10n=0                  #1=Load Localization settings from running system 
+loadl10n=0                  #1=Load Localization settings from running system
 loadlocal=""                #Non-null specifies loading wifi creds on firstboot (currently USB only)
 logwidth=96                 #Split log lines longer than this
 loopdev=""                  #Name of mounted loop device
@@ -303,7 +305,7 @@ customize,datefmt:,ddextend,ddsw:,debug:,directory,domain:,ecolors:,encrypted,ex
 gpt,groups:,host:,hostname:,info,keyfile:,loadlocal:,locale:,logwidth:,\
 mcolors:,mount,no-expand-root,norestart,noreboot,nowait-timesync,nspawnsw:,oklive,os:,plugin-debug,\
 plugin:,plugins:,poptions:,ppart,reboot:,redact,redo-customize,\
-regen-ssh-host-keys,restart,runonly:,sdmdir:,showapt,shrink,swap:,\
+regen-ssh-host-keys,restart,runonly:,sdmdir:,showapt,shrink,single,swap:,\
 bupdate:,xmb:,custom1:,custom2:,custom3:,custom4:,version"
 
 OARGS=$(getopt -o h --longoptions $longopts -n 'sdm' -- "$@")
@@ -373,6 +375,7 @@ do
 	--sdmdir)      sdmdir=$2     ; shift 2 ;;
 	--showapt)     showapt=1     ; shift 1 ;;
 	--shrink)      fshrink=1     ; shift 1 ;;
+	--single)      froot=1       ; shift 1 ;;
 	--swap)        swapsize=$2   ; shift 2 ;;
 	--bupdate)     bupdate=$(appendvalue "$bupdate" "$2" "|") ; shift 2 ;;
 	--xmb)         imgext=$2     ; shift 2 ;;
@@ -468,11 +471,11 @@ then
     [ "$dimg" == "" ] && dimg="/" && fdirtree=1  # Default to running system if nothing specified
 fi
 #
-# Ensure action requested: aptmaint, burn, customize, explore, mount, shrink, ppart 
+# Ensure action requested: aptmaint, burn, customize, explore, mount, shrink, ppart
 #
 if [ $(($aptfunction+$burning+$fcustomize+$fexplore+$fdomount+$fshrink+$fppart+$frunonly)) -eq 0 ]
 then
-    # Handle --extend only 
+    # Handle --extend only
     [ $fextend -eq 0 ] && errexit "? No command specified (--aptmaint --burn, --customize, --explore, --mount, --runonly)"
     fextendonly=1
 fi
@@ -574,7 +577,7 @@ then
     [ ! -b ${dimg}${p1} ] && errexit "? Disk image file or device '$dimg' does not exist"
     dimgdev=1
     dimgdevname="Device"
-fi    
+fi
 if [ $dimgdev -eq 0 -a -f "$dimg" ]
 then
     for fext in xz XZ zip ZIP
@@ -951,7 +954,7 @@ else
     declare -x SDMNSPAWN="Phase0"
     $SDMPT/$sdmdir/sdm-phase0 || exit
     touch $sdmdone
-    
+
     echo "* Enter image '$dimg' for Phase 1"
 fi
 

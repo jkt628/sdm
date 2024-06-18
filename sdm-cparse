@@ -4,7 +4,7 @@
 #
 
 #
-# Common functions 
+# Common functions
 #
 function errexit() {
     echo -e "$1"
@@ -59,7 +59,7 @@ function logtoboth() {
 	    echo "${spc}${str[$i]}"
 	    spc="  "
 	done
-    fi	
+    fi
 }
 
 function logtobothex() {
@@ -367,7 +367,7 @@ function logfreespace() {
     #
     local dev="/" extramsg="$1" free1k freeby dused
     [ "$SDMPT" != "" ] && dev="$SDMPT"
-    free1k=$(getfsdf $dev avail) 
+    free1k=$(getfsdf $dev avail)
     freeby=$(($free1k*1024))
     logtoboth "> $dimgdevname '$dimg' has $free1k 1K-blocks $(getgbstr $freeby) free $extramsg" nosplit
     dused=$(getfsdf / pcent)
@@ -459,7 +459,7 @@ function doconfigitem() {
 	    # These are simple on/off and less commonly used so no elaborate logging for them
 	    configitemlog "Set $rpifun to '$value'" $msgfn
 	    #SUDO_USER=${myuser:-pi} raspi-config do_$rpifun $value nonint
-	    do_raspiconfig do_$rpifun $value 
+	    do_raspiconfig do_$rpifun $value
 	    ;;
 	fstab)
 	    configitemlog "Append fstab extension '$value' to /etc/fstab" $msgfn
@@ -488,7 +488,7 @@ function doconfigitem() {
 	timezone)
 	    configitemlog "Set Timezone to '$value'" $msgfn
 	    #SUDO_USER=${myuser:-pi} raspi-config do_change_timezone "$value" nonint
-	    do_raspiconfig do_change_timezone "$value" 
+	    do_raspiconfig do_change_timezone "$value"
 	    ;;
 	*)
 	    configitemlog "% Unrecognized option '$rpifun'" $msgfn
@@ -739,7 +739,7 @@ function ispluginselected() {
     local thisplugin="$1" pluglist="$2"
     IFS="~" read -r -a plugs <<< "$pluglist"
     for p in "${plugs[@]}"
-    do  
+    do
 	IFS=":" read -r thispn args <<< "$p"
 	[ "$thispn" == "$thisplugin" ] && return 0
     done
@@ -753,7 +753,7 @@ function getpluginargs() {
     local thisplugin="$1" pluglist="$2" arglist=""
     IFS="~" read -r -a plugs <<< "$pluglist"
     for p in "${plugs[@]}"
-    do  
+    do
 	IFS=":" read -r thispn args <<< "$p"
 #??? needs to append correctly
 	[ "$thispn" == "$thisplugin" ] && arglist="${arglist}${args}"
@@ -801,7 +801,7 @@ function plugin_getargs() {
 	if [ "${key#\#}" != "$key" -o "${key#\\n}" != "$key" ]
 	then
 	    # Handle a comment string that starts with '#' or '\n'. Prefix \n-led string with \n#
-	    [ "${key#\\n}" != "$key" ] && key="\n#${key#\\n}" 
+	    [ "${key#\\n}" != "$key" ] && key="\n#${key#\\n}"
 	    printf -v "comment" "%s" "$key"
 	    keysfound="${keysfound}|comment"   # Mark as 'comment' found
 	else
@@ -911,7 +911,7 @@ function checkpluginsx() {
     #
     local plugins="$1" cif=$2
     local p plugs fpn pargs pf dfpn d
-    
+
 if [ "$plugins" != "" ]
 then
     IFS="~" read -a plugs <<< $plugins
@@ -1534,8 +1534,8 @@ function updategptrootfs() {
 
 function extendimage() {
     #
-    # Extend an IMG and resize partition 2
-    # Does NOT resize the file system in partition 2
+    # Extend an IMG and resize root partition
+    # Does NOT resize the file system
     #
     local ldimg=$1 limgext=$2
     local line
@@ -1561,12 +1561,12 @@ function extendimage() {
 	then
 	    IFS=":" read fn imgend remains <<< $line
 	fi
-    done < <(parted -sm $ldimg unit MB print)
-    partstart=${partstart%MB}
-    imgend=${imgend%MB}
+    done < <(parted -sm $ldimg unit B print)
+    partstart=${partstart%B}
+    imgend=${imgend%B}
     partsize=$((imgend-partstart))
-    echo "* Resize partition 2 of '$ldimg' to ${partsize}MB"
-    parted $ldimg -s resizepart 2 ${imgend}MB
+    echo "* Resize partition $froot of '$ldimg' to $((partsize/1048576))MB"
+    parted $ldimg -s resizepart $froot ${partsize}B
 }
 
 function expandpartition() {
@@ -1578,7 +1578,7 @@ function expandpartition() {
     local dev=${fulldevname##/dev/}
     local part pname fsize partstart partend devsize partsize newend pbytes nbytes pend
 
-    pname=$(getpartname $fulldevname 2)
+    pname=$(getpartname $fulldevname $froot)
     part="${dev}${pname}"
     while read line
     do
@@ -1596,7 +1596,7 @@ function expandpartition() {
     done < <(parted -ms /dev/$dev unit B print)
     #
     #   https://alioth-lists.debian.net/pipermail/parted-devel/2006-December/000573.html
-    # $l1: BYT;  ** error if not BYT 
+    # $l1: BYT;  ** error if not BYT
     # $l2: filespec:bytesB:file:512:512:msdos::;
     # $l3: partnum:startB:endB:sizeB:fstype:::;
     # $l4: partnum:startB:endB:sizeB:fstype:::;
@@ -1624,13 +1624,12 @@ function expandpartition() {
 	logtoboth "> Plugin ${pfx}ExpandPartition: nbytes: $nbytes"
     fi
     $msgrtn "> Expand Root: Expand root partition '$part' ($rootfstype) on device '$fulldevname' from $(getgbstr $pbytes) to $(getgbstr $nbytes)"
-    # root partition is always partition 2
     if isgpt $fulldevname
     then
 	[ "$sexp" == "0" ] && pend="" || pend="+$newend"
-	parted -m /dev/$dev u s resizepart 2 $((newend-48))  # ?? 32 not enough, 48 works
+	parted -m /dev/$dev u s resizepart $froot $((newend-48))  # ?? 32 not enough, 48 works
     else
-	parted -m /dev/$dev u s resizepart 2 $newend
+	parted -m /dev/$dev u s resizepart $froot $newend
 	errifrc $? "? parted resizepart failed"
     fi
     $msgrtn "* Mount $fulldevname to resize the root file system"
@@ -1815,7 +1814,12 @@ function domount() {
 	bootsize=${pinfo[1]}
 	rootstart=$((${pinfo[2]}*csize))
 	rootsize=${pinfo[3]}
-        echo "* Mount IMG '$dmimg'"
+	[ "$bootsize" == "Size" ] && froot=1
+        if [ $froot -eq 1 ]; then
+            echo "* Mount single partition IMG '$dmimg'"
+        else
+            echo "* Mount IMG '$dmimg'"
+	fi
 	#
 	# Try mounting with offset/sizelimit with automatic loop device management first
 	#
@@ -1824,7 +1828,7 @@ function domount() {
 	if [ $sts -eq 0 ]
 	then
 	    [ -d $mpoint/boot/firmware ] && mdir="$mpoint/boot/firmware" || mdir="$mpoint/boot"
-	    mount -v -o loop,offset=${bootstart},sizelimit=${bootsize} -t vfat ${dmimg} $mdir
+	    [ $froot -eq 1 ] || mount -v -o loop,offset=${bootstart},sizelimit=${bootsize} -t vfat ${dmimg} $mdir
 	else
 	    #
 	    # Try mounting it with explicit loop device
@@ -1839,7 +1843,7 @@ function domount() {
 	    [ -d $mpoint/boot/firmware ] && mdir="$mpoint/boot/firmware" || mdir="$mpoint/boot"
 	    mount -v ${loopdev}p1 $mdir
 	fi
-	notmounted $mdir && errexit "? Error mounting IMG '$dmimg'"
+	[ $froot -eq 1 ] || { notmounted $mdir && errexit "? Error mounting IMG '$dmimg'"; }
     else # imgtype=Device
 	p1=$(getpartname $dmimg 1)
 	p2=$(getpartname $dmimg 2)
@@ -1865,7 +1869,7 @@ function domount() {
 	    else
 		if [ "$fstype" != "zfs" ]
 		then
-		    mount -v ${dmimg}${p2} $mpoint
+		    mount -v ${dmimg}p${froot} $mpoint
 		else
 		    zfs mount rpool/ROOT/debian
 		fi
@@ -1873,8 +1877,11 @@ function domount() {
 	fi
 	notmounted $mpoint && errexit "? Error mounting device '$dmimg'"
 	[ -d $mpoint/boot/firmware ] && mdir="$mpoint/boot/firmware" || mdir="$mpoint/boot"
-	mount -v ${dmimg}${p1} $mdir
-	notmounted $mdir && errexit "? Error mounting IMG '$dmimg'"
+	if [ $froot -eq 2 ]
+	then
+	    mount -v ${dmimg}${p1} $mdir
+	    notmounted $mdir && errexit "? Error mounting IMG '$dmimg'"
+	fi
     fi
 }
 
@@ -2104,8 +2111,8 @@ function resetcolors() {
     #
     local tfg tbg tcursor
     # old way: eval "tfg=\$${1}fg ; tbg=\$${1}bg ; tcursor=\$${1}cursor"
-    tfgn="${1}fg" ; tbgn="${1}bg" ; tcn="${1}cursor" 
-    printf -v tfg "%s" "${!tfgn}" 
+    tfgn="${1}fg" ; tbgn="${1}bg" ; tcn="${1}cursor"
+    printf -v tfg "%s" "${!tfgn}"
     printf -v tbg "%s" "${!tbgn}"
     printf -v tcursor "%s" "${!tcn}"
     stermcolors "$tfg" "$tbg" "$tcursor"
@@ -2129,7 +2136,7 @@ function morseled() {
 	    -) flashled0 $dot ;;
 	    " ") sleep $inter ;;
 	esac
-	
+
     done
 }
 
